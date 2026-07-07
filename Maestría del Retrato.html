@@ -1,0 +1,309 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maestría del Retrato - Juego de Dibujo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #f5efe6; }
+        .card-bg { background-color: #fffcf5; }
+        .text-coffee { color: #4a3728; }
+        .bg-coffee { background-color: #4a3728; }
+        .border-coffee { border-color: #d6c9b8; }
+        .text-warm { color: #8c745e; }
+        .transition-all { transition: all 0.3s ease; }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .float-animation { animation: float 4s ease-in-out infinite; }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-10px); }
+            40% { transform: translateX(10px); }
+            60% { transform: translateX(-10px); }
+            80% { transform: translateX(10px); }
+            100% { transform: translateX(0); }
+        }
+        .shake-animation { animation: shake 0.4s ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="float-animation w-full max-w-lg card-bg rounded-3xl shadow-xl p-8 text-coffee border border-[#d6c9b8] relative overflow-hidden">
+    </div>
+
+    <script>
+        const state = {
+            playerName: "",
+            playerAvatar: null,
+            currentView: "welcome",
+            currentQuestion: 0,
+            score: 0,
+            lives: 3,
+            time: 30,
+            timerInterval: null,
+            ttt: {
+                grid: ['', '', '', '', '', '', '', '', ''],
+                active: false
+            }
+        };
+
+        const avatars = ['🖌️', '✏️', '🎨', '🖼️'];
+        const jacobAvatar = '🧐';
+
+        const questions = [
+            { title: "Proporciones", jacob: "Oye, ¿has notado que la luz viene de la izquierda? No, espera, ignórame... ¿cuántos tercios tiene el rostro?", question: "¿En cuántas partes iguales se divide el rostro según la regla de los tercios?", options: ["2 partes", "3 partes", "4 partes"], correct: 1 },
+            { title: "Los Ojos", jacob: "Hmm, esa mandíbula se ve un poco rara en tu boceto mental, ¿no crees? Concéntrate en los ojos.", question: "¿Cuál es el ancho total aproximado del rostro en 'ojos'?", options: ["3 ojos", "5 ojos", "7 ojos"], correct: 1 },
+            { title: "Boca", jacob: "No te distraigas conmigo, ¡tienes un reloj que corre! Además, los labios siempre me han parecido imposibles.", question: "¿Con qué parte del ojo se alinean las comisuras de los labios?", options: ["El borde exterior", "El centro de la pupila", "El borde interior"], correct: 1 },
+            { title: "Nariz", jacob: "Dibujar es fácil, lo difícil es no manchar el papel de grafito, jaja. ¿Sabes dónde va esa nariz?", question: "¿Con qué parte se alinea horizontalmente la base de la nariz?", options: ["El lóbulo de la oreja", "La ceja", "El lagrimal"], correct: 0 },
+            { title: "Orejas", jacob: "Concentración total. O era... ¿concentración parcial? Nunca me acuerdo. ¿Qué altura tienen las orejas?", question: "¿Cuál es la altura típica de las orejas?", options: ["Desde la frente a la barbilla", "Desde la línea de las cejas a la base de la nariz", "Solo la mitad del rostro"], correct: 1 },
+            { title: "Cabeza", jacob: "Si fueras un trazo, serías uno muy indeciso. ¡Vamos, elige una forma geométrica!", question: "¿Qué forma geométrica básica describe mejor la cabeza?", options: ["Un cuadrado", "Un círculo perfecto", "Un óvalo"], correct: 2 },
+            { title: "Simetría", jacob: "Casi lo tienes, o quizás no. La simetría es solo un mito, pero responde rápido antes de que se acabe el tiempo.", question: "¿Cómo se llama la línea que divide el rostro verticalmente?", options: ["Eje de simetría", "Línea de horizonte", "Regla de tercios"], correct: 0 },
+            { title: "Cuello", jacob: "Te estás olvidando del soporte... ¡la cabeza no flota mágicamente, o tal vez sí!", question: "¿Qué anchura suele tener el cuello en relación a la mandíbula?", options: ["La mitad de la anchura de la mandíbula", "La misma anchura de la frente", "El doble de la mandíbula"], correct: 0 },
+            { title: "Cabello", jacob: "Demasiado pelo y poco cerebro, jaja... es broma. ¿Dónde empieza realmente el cráneo?", question: "¿En qué tercio del rostro comienza la línea de nacimiento del cabello?", options: ["En el primer tercio superior", "En el centro de la frente", "En la base de las cejas"], correct: 0 },
+            { title: "Perfil", jacob: "El perfil es engañoso, como tú tratando de ganarme. ¡La mandíbula es clave!", question: "¿Qué ángulo caracteriza a la mandíbula en un perfil?", options: ["Un ángulo recto de 90°", "Una curva suave sin ángulos", "Una línea diagonal hacia abajo"], correct: 0 },
+            { title: "Sombras", jacob: "La luz no perdona, pero Jacob sí... a veces. ¿Sabes dónde cae la sombra propia de la nariz?", question: "¿En qué lado suele caer la sombra de la nariz para crear volumen?", options: ["Directamente debajo", "En el lado opuesto a la fuente de luz", "En el puente de la nariz"], correct: 1 },
+            { title: "Cuencas Oculares", jacob: "Tus ojos están muy juntos, o es mi imaginación. ¡Céntrate!", question: "¿Qué profundidad deben tener las cuencas oculares?", options: ["Deben ser planas", "Deben crear sombra bajo la ceja", "Deben estar al mismo nivel que la nariz"], correct: 1 }
+        ];
+
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (state.currentView === 'welcome') {
+                app.innerHTML = `
+                    <div class="text-center space-y-6">
+                        <h1 class="text-3xl font-semibold">Maestría del Retrato</h1>
+                        <p class="text-[#8c745e] leading-relaxed">
+                            Bienvenido, artista. Tienes <strong>30 segundos</strong> totales para completar las preguntas de anatomía facial.
+                            <br><br>
+                            ⚠️ <strong>¡Cuidado con Jacob!</strong> Él aparecerá para distraerte. Si fallas, te retará a un Tres en Línea para intentar quitarte una vida.
+                        </p>
+                        <input type="text" id="nameInput" placeholder="Tu nombre..." class="w-full p-4 border border-[#d6c9b8] rounded-xl outline-none bg-[#fdfaf5] text-center focus:ring-2 focus:ring-[#8c745e]">
+                        <button onclick="goToAvatarSelection()" class="w-full py-4 bg-coffee text-[#f5efe6] rounded-xl font-semibold hover:opacity-90 transition-all">
+                            Siguiente
+                        </button>
+                    </div>
+                `;
+            } else if (state.currentView === 'avatar-selection') {
+                app.innerHTML = `
+                    <div class="text-center space-y-6">
+                        <h2 class="text-2xl font-bold">Elige tu avatar</h2>
+                        <div class="grid grid-cols-2 gap-4">
+                            ${avatars.map((a, i) => `
+                                <button onclick="selectAvatar(${i})" class="text-4xl p-6 border-2 border-[#d6c9b8] rounded-2xl hover:bg-[#eaddcf] transition-all">
+                                    ${a}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (state.currentView === 'game') {
+                const q = questions[state.currentQuestion];
+                const percentage = (state.time / 30) * 100;
+                const jacobInfluenceIdx = Math.random() > 0.5 ? Math.floor(Math.random() * q.options.length) : -1;
+
+                app.innerHTML = `
+                    <div id="feedbackContainer" class="absolute inset-0 flex items-center justify-center z-50 pointer-events-none hidden">
+                        <div id="feedbackIcon" class="text-6xl text-green-500 font-bold bg-white/80 p-4 rounded-full shadow-lg">✓</div>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center text-sm text-[#8c745e] font-semibold uppercase tracking-wider">
+                            <span>${state.playerAvatar} ${state.playerName}</span>
+                            <span>Vidas: ${'♥'.repeat(state.lives)}</span>
+                        </div>
+                        <div class="w-full h-2 bg-[#d6c9b8] rounded-full overflow-hidden">
+                            <div id="timerBar" class="h-full bg-coffee transition-all duration-300" style="width: ${Math.max(0, percentage)}%"></div>
+                        </div>
+                        <div class="text-center font-bold text-coffee">Tiempo restante: ${state.time}s</div>
+                        
+                        <div class="bg-[#f5efe6] p-4 rounded-2xl border-l-4 border-[#8c745e] flex items-start gap-4">
+                            <div class="text-2xl">${jacobAvatar}</div>
+                            <div>
+                                <p class="text-[#4a3728] font-bold text-xs">Jacob:</p>
+                                <p class="text-[#8c745e] text-xs italic">${q.jacob}</p>
+                            </div>
+                        </div>
+                        
+                        <h2 class="text-xl font-bold">${q.question}</h2>
+                        <div class="grid gap-3">
+                            ${q.options.map((opt, i) => `
+                                <button onclick="checkAnswer(${i})" class="relative text-left p-4 rounded-xl border border-[#d6c9b8] hover:bg-[#8c745e] hover:text-white transition-all">
+                                    ${opt}
+                                    ${i === jacobInfluenceIdx ? `<span class="absolute -top-2 -right-2 text-[10px] bg-coffee text-white px-2 py-0.5 rounded-full animate-pulse">¡Elige este!</span>` : ''}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (state.currentView === 'tictactoe') {
+                renderTicTacToe();
+            } else if (state.currentView === 'result') {
+                const hasWon = state.currentQuestion >= questions.length && state.lives > 0;
+                app.innerHTML = `
+                    <div class="text-center space-y-6">
+                        <h2 class="text-3xl font-bold text-coffee">
+                            ${hasWon ? '¡Maestría absoluta!' : 'Jacob tenía razón...'}
+                        </h2>
+                        <p class="text-lg text-[#8c745e]">
+                            ${hasWon 
+                                ? `¡Excelente, ${state.playerName}! Superaste tanto el examen como las distracciones de Jacob. ¡Un verdadero artista!` 
+                                : 'Te dejaste llevar por las distracciones de Jacob. El arte requiere enfoque, ¡vuelve a intentarlo!'}
+                        </p>
+                        <button onclick="resetGame()" class="py-3 px-8 bg-coffee text-[#f5efe6] rounded-xl hover:opacity-90 transition-all">
+                            Volver al inicio
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function initTicTacToe() {
+            // Setup a random board where the player has a chance to win
+            const board = ['', '', '', '', '', '', '', '', ''];
+            // Place some marks: 3 for O (Jacob), 3 for X (Player)
+            const moves = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+            const shuffled = moves.sort(() => 0.5 - Math.random());
+            
+            // Give Jacob 3, give player 3. Empty 3.
+            for(let i=0; i<3; i++) board[shuffled[i]] = 'O'; // Jacob
+            for(let i=3; i<6; i++) board[shuffled[i]] = 'X'; // Player
+            
+            state.ttt.grid = board;
+        }
+
+        function checkWinner(board) {
+            const lines = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6]
+            ];
+            for (let line of lines) {
+                const [a, b, c] = line;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+            }
+            return null;
+        }
+
+        function playTicTacToe(idx) {
+            if (state.ttt.grid[idx] !== '') return;
+            state.ttt.grid[idx] = 'X';
+            
+            const winner = checkWinner(state.ttt.grid);
+            if (winner === 'X') {
+                // User Won! No life lost.
+                state.currentView = 'game';
+                render();
+            } else {
+                // User didn't win, Jacob wins this round. Lose life.
+                state.lives--;
+                if (state.lives <= 0) {
+                    state.currentView = 'result';
+                } else {
+                    state.currentView = 'game';
+                }
+                render();
+            }
+        }
+
+        function renderTicTacToe() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="text-center space-y-4">
+                    <h2 class="text-xl font-bold text-coffee">¡Jacob te reta a un Tres en Línea!</h2>
+                    <p class="text-sm text-[#8c745e]">Si ganas, salvas tu vida. ¡Elige sabiamente!</p>
+                    <div class="grid grid-cols-3 gap-2 w-48 mx-auto">
+                        ${state.ttt.grid.map((cell, i) => `
+                            <button onclick="playTicTacToe(${i})" class="w-14 h-14 border border-[#d6c9b8] rounded flex items-center justify-center text-2xl font-bold text-coffee hover:bg-[#eaddcf]">
+                                ${cell}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function triggerFeedback(isCorrect) {
+            const app = document.getElementById('app');
+            if (isCorrect) {
+                const fb = document.getElementById('feedbackContainer');
+                fb.classList.remove('hidden');
+                setTimeout(() => fb.classList.add('hidden'), 500);
+            } else {
+                app.classList.add('shake-animation');
+                setTimeout(() => app.classList.remove('shake-animation'), 400);
+            }
+        }
+
+        function goToAvatarSelection() {
+            const name = document.getElementById('nameInput').value;
+            if (!name.trim()) return;
+            state.playerName = name;
+            state.currentView = 'avatar-selection';
+            render();
+        }
+
+        function selectAvatar(index) {
+            state.playerAvatar = avatars[index];
+            startGame();
+        }
+
+        function startGame() {
+            state.currentView = 'game';
+            state.timerInterval = setInterval(() => {
+                if (state.currentView === 'game') {
+                    state.time--;
+                    if (state.time <= 0) {
+                        clearInterval(state.timerInterval);
+                        state.time = 0;
+                        state.currentView = 'result';
+                    }
+                    render();
+                }
+            }, 1000);
+            render();
+        }
+
+        function checkAnswer(index) {
+            const isCorrect = index === questions[state.currentQuestion].correct;
+            triggerFeedback(isCorrect);
+
+            if (isCorrect) {
+                state.score++;
+                state.time += 3;
+                state.currentQuestion++;
+                if (state.currentQuestion >= questions.length) {
+                    clearInterval(state.timerInterval);
+                    state.currentView = 'result';
+                }
+                render();
+            } else {
+                state.time -= 5;
+                // If wrong, Jacob forces a game of Tic Tac Toe
+                initTicTacToe();
+                state.currentView = 'tictactoe';
+                render();
+            }
+        }
+
+        function resetGame() {
+            state.currentQuestion = 0;
+            state.score = 0;
+            state.lives = 3;
+            state.time = 30;
+            state.currentView = 'welcome';
+            render();
+        }
+
+        window.onload = render;
+    </script>
+</body>
+</html>
+
+```
